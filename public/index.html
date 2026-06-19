@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF a Markdown</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      text-align: center;
+      padding: 2rem;
+      max-width: 500px;
+      width: 100%;
+    }
+    h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+    p { color: #888; margin-bottom: 2rem; }
+    .drop-zone {
+      border: 2px dashed #444;
+      border-radius: 16px;
+      padding: 3rem 2rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 1.5rem;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: #fff;
+      background: #1a1a1a;
+    }
+    .drop-zone input { display: none; }
+    .drop-zone .icon { font-size: 3rem; margin-bottom: 1rem; }
+    .drop-zone .text { color: #888; }
+    .drop-zone .text span { color: #fff; text-decoration: underline; cursor: pointer; }
+    #status {
+      padding: 1rem;
+      border-radius: 8px;
+      display: none;
+      margin-bottom: 1rem;
+    }
+    #status.loading { background: #1a1a1a; color: #888; display: block; }
+    #status.success { background: #0f2d1a; color: #4ade80; display: block; }
+    #status.error { background: #2d0f0f; color: #f87171; display: block; }
+    .btn-download {
+      background: #fff;
+      color: #000;
+      border: none;
+      padding: 0.8rem 2rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: none;
+      width: 100%;
+    }
+    .btn-download:hover { background: #ddd; }
+    .footer { margin-top: 2rem; color: #444; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>PDF → Markdown</h1>
+    <p>Sube tu PDF y descárgalo como .md listo para Claude</p>
+
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".pdf">
+      <div class="icon">📄</div>
+      <div class="text">Arrastra tu PDF aquí o <span onclick="document.getElementById('fileInput').click()">selecciona un archivo</span></div>
+    </div>
+
+    <div id="status"></div>
+    <button class="btn-download" id="btnDownload">⬇️ Descargar .md</button>
+
+    <div class="footer">Archivos no almacenados • Conversión instantánea</div>
+  </div>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const status = document.getElementById('status');
+    const btnDownload = document.getElementById('btnDownload');
+    let mdContent = '';
+    let fileName = '';
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type === 'application/pdf') handleFile(file);
+      else showError('Solo se aceptan archivos PDF');
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+
+    async function handleFile(file) {
+      fileName = file.name.replace('.pdf', '');
+      showLoading(`Convirtiendo "${file.name}"...`);
+      btnDownload.style.display = 'none';
+
+      const formData = new FormData();
+      formData.append('pdf', file);
+
+      try {
+        const res = await fetch('/api/convert', { method: 'POST', body: formData });
+        if (!res.ok) throw new Error('Error en la conversión');
+        mdContent = await res.text();
+        showSuccess('¡Listo! Tu archivo está convertido.');
+        btnDownload.style.display = 'block';
+      } catch (err) {
+        showError('Error al convertir. Intenta de nuevo.');
+      }
+    }
+
+    btnDownload.addEventListener('click', () => {
+      const blob = new Blob([mdContent], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${fileName}.md`;
+      a.click();
+    });
+
+    function showLoading(msg) {
+      status.className = 'loading';
+      status.textContent = '⏳ ' + msg;
+    }
+    function showSuccess(msg) {
+      status.className = 'success';
+      status.textContent = '✅ ' + msg;
+    }
+    function showError(msg) {
+      status.className = 'error';
+      status.textContent = '❌ ' + msg;
+    }
+  </script>
+</body>
+</html>
