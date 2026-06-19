@@ -7,32 +7,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f0f0f;
-      color: #fff;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .container {
-      text-align: center;
-      padding: 2rem;
-      max-width: 500px;
-      width: 100%;
-    }
+    body { font-family: sans-serif; background: #0f0f0f; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .container { text-align: center; padding: 2rem; max-width: 500px; width: 100%; }
     h1 { font-size: 2rem; margin-bottom: 0.5rem; }
     p { color: #888; margin-bottom: 2rem; }
-    .drop-zone {
-      border: 2px dashed #444;
-      border-radius: 16px;
-      padding: 3rem 2rem;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-bottom: 1.5rem;
-    }
-    .drop-zone:hover, .drop-zone.drag-over { border-color: #fff; background: #1a1a1a; }
+    .drop-zone { border: 2px dashed #444; border-radius: 16px; padding: 3rem 2rem; cursor: pointer; margin-bottom: 1.5rem; }
+    .drop-zone:hover { border-color: #fff; background: #1a1a1a; }
     .drop-zone .icon { font-size: 3rem; margin-bottom: 1rem; }
     .drop-zone .text { color: #888; }
     .drop-zone .text span { color: #fff; text-decoration: underline; cursor: pointer; }
@@ -40,12 +20,7 @@
     #status.loading { background: #1a1a1a; color: #888; display: block; }
     #status.success { background: #0f2d1a; color: #4ade80; display: block; }
     #status.error { background: #2d0f0f; color: #f87171; display: block; }
-    .btn-download {
-      background: #fff; color: #000; border: none;
-      padding: 0.8rem 2rem; border-radius: 8px;
-      font-size: 1rem; font-weight: 600; cursor: pointer;
-      display: none; width: 100%;
-    }
+    .btn-download { background: #fff; color: #000; border: none; padding: 0.8rem 2rem; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; display: none; width: 100%; }
     .btn-download:hover { background: #ddd; }
     .footer { margin-top: 2rem; color: #444; font-size: 0.8rem; }
   </style>
@@ -61,66 +36,46 @@
     </div>
     <div id="status"></div>
     <button class="btn-download" id="btnDownload">⬇️ Descargar .md</button>
-    <div class="footer">Conversión local • Archivos no almacenados</div>
+    <div class="footer">Conversión local • Archivos no almacenados • v2</div>
   </div>
-
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const status = document.getElementById('status');
     const btnDownload = document.getElementById('btnDownload');
-    let mdContent = '';
-    let fileName = '';
-
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('drag-over');
-      const file = e.dataTransfer.files[0];
-      if (file?.type === 'application/pdf') handleFile(file);
-      else showError('Solo se aceptan archivos PDF');
-    });
-    fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
-
+    let mdContent = '', fileName = '';
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor='#fff'; });
+    dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor='#444'; });
+    dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.style.borderColor='#444'; const f=e.dataTransfer.files[0]; if(f?.type==='application/pdf') handleFile(f); else showError('Solo PDFs'); });
+    fileInput.addEventListener('change', () => { if(fileInput.files[0]) handleFile(fileInput.files[0]); });
     async function handleFile(file) {
-      fileName = file.name.replace('.pdf', '');
-      showLoading('Convirtiendo "' + file.name + '"...');
-      btnDownload.style.display = 'none';
-
+      fileName = file.name.replace('.pdf','');
+      showLoading('Convirtiendo "'+file.name+'"...');
+      btnDownload.style.display='none';
       try {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const ab = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({data: ab}).promise;
         const lines = [];
-
-        for (let i = 1; i <= pdf.numPages; i++) {
+        for(let i=1;i<=pdf.numPages;i++) {
           const page = await pdf.getPage(i);
           const content = await page.getTextContent();
-          const pageText = content.items.map(item => item.str).join(' ');
-          lines.push(pageText);
+          lines.push(content.items.map(x=>x.str).join(' '));
           lines.push('');
         }
-
         mdContent = lines.join('\n');
-        showSuccess('¡Listo! Tu archivo está convertido.');
-        btnDownload.style.display = 'block';
-      } catch (e) {
-        showError('Error al convertir: ' + e.message);
-      }
+        showSuccess('¡Listo!');
+        btnDownload.style.display='block';
+      } catch(e) { showError('Error: '+e.message); }
     }
-
     btnDownload.addEventListener('click', () => {
-      const blob = new Blob([mdContent], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = fileName + '.md'; a.click();
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([mdContent],{type:'text/markdown'}));
+      a.download=fileName+'.md'; a.click();
     });
-
-    function showLoading(msg) { status.className = 'loading'; status.textContent = '⏳ ' + msg; }
-    function showSuccess(msg) { status.className = 'success'; status.textContent = '✅ ' + msg; }
-    function showError(msg) { status.className = 'error'; status.textContent = '❌ ' + msg; }
+    function showLoading(m){status.className='loading';status.textContent='⏳ '+m;}
+    function showSuccess(m){status.className='success';status.textContent='✅ '+m;}
+    function showError(m){status.className='error';status.textContent='❌ '+m;}
   </script>
 </body>
 </html>
